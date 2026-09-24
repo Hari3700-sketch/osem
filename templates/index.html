@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UP MSME Assistant</title>
+<style>
+  :root {
+    --theme-plum: #700078;
+    --theme-plum-dark: #52005b;
+    --theme-plum-deep: #43004b;
+    --theme-lilac: #d7a8dc;
+    --theme-lilac-soft: #f2e4f3;
+    --theme-ink: #36003d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  html, body { height: 100%; background: radial-gradient(circle at 20% 15%, #f6dff5 0, transparent 34%), #f8eef8; }
+
+  .toggle-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    border-radius: 50%;
+    background: var(--theme-plum);
+    box-shadow: 0 8px 24px rgba(112,0,120,0.42);
+    padding: 3px;
+    border: none;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: transform 0.2s ease;
+  }
+  .toggle-btn:hover { transform: scale(1.06); }
+  .toggle-btn img { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 50%; background: #fff; }
+  .toggle-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; background: #fff; color: var(--theme-plum); font-size: 9px; font-weight: 800; letter-spacing: 0.4px; }
+  .toggle-btn.open .toggle-fallback { display: none; }
+  .toggle-btn svg { display: block; width: 24px; height: 24px; max-width: 24px; max-height: 24px; flex: 0 0 24px; fill: #fff; }
+  .toggle-btn .icon-chat { width: 46px; height: 46px; max-width: 46px; max-height: 46px; flex-basis: 46px; fill: none; }
+  .toggle-btn .icon-close { display: none; }
+  .toggle-btn.open .icon-chat { display: none; }
+  .toggle-btn.open .icon-close { display: block; }
+
+  .chat-widget {
+    position: fixed;
+    bottom: 92px;
+    right: 24px;
+    width: 390px;
+    max-width: calc(100vw - 32px);
+    height: min(660px, calc(100vh - 128px));
+    min-height: 430px;
+    background: #fffaff;
+    border-radius: 18px;
+    border: 1px solid rgba(148,163,184,0.28);
+    box-shadow: 0 20px 55px rgba(15,23,42,0.24), 0 4px 12px rgba(15,23,42,0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: scale(0.9) translateY(12px);
+    opacity: 0;
+    pointer-events: none;
+    transform-origin: bottom right;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+    z-index: 999;
+  }
+  .chat-widget.open {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-header { background: linear-gradient(135deg, var(--theme-plum-deep), var(--theme-plum)); color: #fff; padding: 16px 17px 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .chat-header-text { min-width: 0; }
+  .chat-header-text h1 { font-size: 14px; line-height: 1.35; font-weight: 700; }
+  .chat-header-text p { font-size: 10.5px; line-height: 1.4; opacity: 0.78; margin-top: 5px; }
+
+  .chat-header-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .header-btn {
+    background: rgba(255,255,255,0.16);
+    border: none;
+    color: #fff;
+    border-radius: 14px;
+    height: 26px;
+    padding: 0 9px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background 0.15s ease;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.3); }
+  .header-btn svg { width: 14px; height: 14px; fill: #fff; }
+  .header-btn.active { background: #fff; color: var(--theme-plum); }
+  .header-btn.active svg { fill: var(--theme-plum); }
+
+  .lang-switch { display: flex; background: rgba(255,255,255,0.16); border-radius: 14px; padding: 2px; gap: 2px; }
+  .lang-btn { background: transparent; border: none; color: #fff; border-radius: 12px; height: 22px; padding: 0 9px; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+  .lang-btn.active { background: #fff; color: var(--theme-plum); }
+
+  .chat-messages { flex: 1; padding: 16px 14px; overflow-y: auto; background: var(--theme-lilac-soft); display: flex; flex-direction: column; gap: 10px; }
+  .message { max-width: 90%; padding: 10px 12px; border-radius: 13px; font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+  .message.user { align-self: flex-end; background: var(--theme-plum); color: #fff; border-bottom-right-radius: 4px; }
+  .message.bot { align-self: flex-start; background: #fff; color: var(--theme-ink); border: 1px solid #e6cde7; border-bottom-left-radius: 4px; }
+  .message.typing { align-self: flex-start; background: #ead2eb; color: var(--theme-plum-dark); font-style: italic; }
+  .message.bot strong { font-weight: 700; color: var(--theme-plum-dark); }
+  .message.bot em { font-style: italic; }
+  .message.bot h2, .message.bot h3 { font-size: 16px; margin: 0 0 5px; }
+  .message.bot ul, .message.bot ol { margin: 5px 0 5px 18px; padding: 0; }
+  .message.bot li { margin: 3px 0; }
+  .message.bot p { margin: 0 0 7px; }
+  .message.bot p:last-child { margin-bottom: 0; }
+  .message.bot a { color: var(--theme-plum); text-decoration: underline; font-weight: 600; }
+  .message.bot-content { position: relative; padding-bottom: 32px; }
+
+  .chat-input { position: relative; display: flex; padding: 12px; gap: 7px; border-top: 1px solid #e6cde7; background: #fffaff; align-items: center; }
+  .chat-input input { flex: 1; min-width: 0; padding: 10px 13px; border: 1px solid #d4a9d7; border-radius: 20px; font-size: 12.5px; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+  .chat-input input:focus { border-color: var(--theme-plum); box-shadow: 0 0 0 3px rgba(112,0,120,0.12); }
+  .chat-input button#sendBtn { background: var(--theme-plum); color: #fff; border: none; min-height: 36px; padding: 0 15px; border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; }
+  .chat-input button#sendBtn:hover { background: var(--theme-plum-dark); transform: translateY(-1px); }
+  .chat-input button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .mic-btn {
+    background: var(--theme-lilac-soft);
+    border: 1px solid #d4a9d7;
+    color: var(--theme-plum);
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .mic-btn svg { width: 17px; height: 17px; fill: var(--theme-plum); }
+  .mic-btn:hover { background: #ead2eb; border-color: var(--theme-plum); }
+  .mic-btn.listening { background: #dc2626; border-color: #b91c1c; animation: mic-pulse 1s infinite; }
+  .mic-btn.listening svg { fill: #fff; }
+  .mic-btn[hidden] { display: none; }
+  .voice-status { display: none; position: absolute; right: 12px; bottom: 59px; padding: 5px 9px; border-radius: 10px; background: #991b1b; color: #fff; font-size: 10px; font-weight: 600; box-shadow: 0 4px 12px rgba(127,29,29,0.22); }
+  .voice-status.visible { display: block; }
+
+  @media (max-width: 520px) {
+    .toggle-btn { right: 16px; bottom: 16px; }
+    .chat-widget { right: 16px; bottom: 84px; width: calc(100vw - 32px); height: calc(100vh - 108px); min-height: 400px; }
+  }
+
+  @media (max-height: 560px) and (orientation: landscape) {
+    .chat-widget { height: calc(100vh - 92px); min-height: 360px; }
+  }
+
+  @keyframes mic-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.45); }
+    70% { box-shadow: 0 0 0 8px rgba(220,38,38,0); }
+    100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+  }
+</style>
+</head>
+<body>
+
+<button class="toggle-btn" id="toggleBtn">
+  <svg class="icon-chat" viewBox="0 0 64 64" role="img" aria-label="Open chatbot">
+    <path d="M14 28a18 18 0 0 1 36 0v8a18 18 0 0 1-36 0z" fill="#c9e0e5" stroke="#07344d" stroke-width="3"/>
+    <path d="M10 30a4 7 0 0 0 0 14h5V30zM54 30a4 7 0 0 1 0 14h-5V30z" fill="#5bd6d8" stroke="#07344d" stroke-width="3"/>
+    <path d="M20 29h24a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4v-8a4 4 0 0 1 4-4z" fill="#07344d"/>
+    <circle cx="26" cy="37" r="3" fill="#5bd6d8"/>
+    <circle cx="38" cy="37" r="3" fill="#5bd6d8"/>
+    <path d="M28 43h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    <path d="M32 10v6M27 10a5 5 0 0 1 10 0" stroke="#07344d" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="8" r="3" fill="#5bd6d8" stroke="#07344d" stroke-width="2"/>
+  </svg>
+  <svg class="icon-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+</button>
+
+<div class="chat-widget" id="chatWidget">
+  <div class="chat-header">
+    <div class="chat-header-text">
+      <h1>Skill Development Assistant</h1>
+    </div>
+    <div class="chat-header-controls">
+      <div class="lang-switch">
+        <button class="lang-btn active" id="langEnBtn" type="button" data-lang="en">EN</button>
+        <button class="lang-btn" id="langHiBtn" type="button" data-lang="hi">हिं</button>
+      </div>
+    </div>
+  </div>
+  <div class="chat-messages" id="messages">
+    <div class="message bot" id="initialGreeting">Namaste! Ask me anything about MSMEOSEM, CM Yuva, CM Youth Adda.</div>
+  </div>
+  <div class="chat-input">
+    <div class="voice-status" id="voiceStatus" aria-live="polite">Listening...</div>
+    <input type="text" id="userInput" placeholder="Type your question..." autocomplete="off">
+    <button class="mic-btn" id="micBtn" type="button" title="Ask by speaking" hidden>
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>
+    </button>
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script>
+const toggleBtn = document.getElementById('toggleBtn');
+const chatWidget = document.getElementById('chatWidget');
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const micBtn = document.getElementById('micBtn');
+const voiceStatus = document.getElementById('voiceStatus');
+const langEnBtn = document.getElementById('langEnBtn');
+const langHiBtn = document.getElementById('langHiBtn');
+const initialGreetingEl = document.getElementById('initialGreeting');
+
+let isListening = false;
+
+const UI_TEXT = {
+  en: {
+    greeting: 'Namaste! Ask me anything about MSMEOSEM, CM Yuva, CM Youth Adda.',
+    placeholder: 'Type your question...',
+    typing: 'Typing...',
+    listening: 'Listening...',
+    send: 'Send',
+    micTitle: 'Ask by speaking',
+    greetingReply: 'Hello, how can I assist you?',
+    errorPrefix: 'Error: ',
+    errorUnavailable: 'The assistant is temporarily unavailable. Please try again.',
+    errorNoResponse: 'I could not generate a response. Please try again.',
+    speechLang: 'en-IN',
+  },
+  hi: {
+    greeting: 'नमस्ते! MSMEOSEM, CM Yuva, CM Youth Adda से जुड़ा कोई भी सवाल पूछें।',
+    placeholder: 'अपना सवाल लिखें...',
+    typing: 'लिख रहे हैं...',
+    listening: 'सुन रहे हैं...',
+    send: 'भेजें',
+    micTitle: 'बोलकर पूछें',
+    greetingReply: 'नमस्ते, मैं आपकी किस प्रकार सहायता कर सकता/सकती हूँ?',
+    errorPrefix: 'त्रुटि: ',
+    errorUnavailable: 'सहायक अभी उपलब्ध नहीं है। कृपया दोबारा प्रयास करें।',
+    errorNoResponse: 'मैं जवाब नहीं दे सका/सकी। कृपया दोबारा प्रयास करें।',
+    speechLang: 'hi-IN',
+  },
+};
+
+let currentLang = (localStorage.getItem('msme_chat_lang') === 'hi') ? 'hi' : 'en';
+
+function applyLanguage(lang, isInitial) {
+  currentLang = lang === 'hi' ? 'hi' : 'en';
+  localStorage.setItem('msme_chat_lang', currentLang);
+  const text = UI_TEXT[currentLang];
+  langEnBtn.classList.toggle('active', currentLang === 'en');
+  langHiBtn.classList.toggle('active', currentLang === 'hi');
+  inputEl.placeholder = text.placeholder;
+  sendBtn.textContent = text.send;
+  micBtn.title = text.micTitle;
+  micBtn.setAttribute('aria-label', text.micTitle);
+  voiceStatus.textContent = text.listening;
+  if (recognition) recognition.lang = text.speechLang;
+  if (isInitial && initialGreetingEl) initialGreetingEl.textContent = text.greeting;
+}
+
+langEnBtn.addEventListener('click', function () { applyLanguage('en', false); });
+langHiBtn.addEventListener('click', function () { applyLanguage('hi', false); });
+
+toggleBtn.addEventListener('click', function () {
+  chatWidget.classList.toggle('open');
+  toggleBtn.classList.toggle('open');
+  if (chatWidget.classList.contains('open')) {
+    inputEl.focus();
+  }
+});
+
+function addMessage(text, sender) {
+  const div = document.createElement('div');
+  div.className = 'message ' + sender;
+  if (sender === 'bot') {
+    div.classList.add('bot-content');
+    renderBotHtml(div, text);
+  } else {
+    div.textContent = text;
+  }
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function convertMarkdownFormatting(html) {
+  return html
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+}
+
+function appendFormattedText(parent, text) {
+  const formattingPattern = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  let cursor = 0;
+  let match;
+  while ((match = formattingPattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    }
+    const marker = match[0];
+    const isBold = marker.startsWith('**');
+    const formatted = document.createElement(isBold ? 'strong' : 'em');
+    formatted.textContent = marker.slice(isBold ? 2 : 1, isBold ? -2 : -1);
+    parent.appendChild(formatted);
+    cursor = match.index + marker.length;
+  }
+  if (cursor < text.length) {
+    parent.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+}
+
+function appendTextWithLinks(parent, text) {
+  const urlPattern = /https:\/\/[^\s<>"]+/gi;
+  let cursor = 0;
+  let match;
+  while ((match = urlPattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      appendFormattedText(parent, text.slice(cursor, match.index));
+    }
+    const trailingPunctuation = match[0].match(/[.,;:!?)]$/);
+    const url = trailingPunctuation ? match[0].slice(0, -1) : match[0];
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = new URL(url).hostname.replace(/^www\./i, '');
+    parent.appendChild(link);
+    if (trailingPunctuation) {
+      parent.appendChild(document.createTextNode(trailingPunctuation[0]));
+    }
+    cursor = match.index + match[0].length;
+  }
+  if (cursor < text.length) {
+    appendFormattedText(parent, text.slice(cursor));
+  }
+}
+
+function renderBotHtml(container, html) {
+  const template = document.createElement('template');
+  template.innerHTML = convertMarkdownFormatting(html);
+  const allowedTags = new Set(['A', 'BR', 'EM', 'H2', 'H3', 'LI', 'OL', 'P', 'STRONG', 'UL']);
+
+  function copyNode(node, parent) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (parent.tagName === 'A') {
+        appendFormattedText(parent, node.nodeValue);
+      } else {
+        appendTextWithLinks(parent, node.nodeValue);
+      }
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (!allowedTags.has(node.tagName)) {
+      Array.from(node.childNodes).forEach(child => copyNode(child, parent));
+      return;
+    }
+    const cleanNode = document.createElement(node.tagName.toLowerCase());
+    if (node.tagName === 'A' && /^https:\/\//i.test(node.getAttribute('href') || '')) {
+      cleanNode.href = node.getAttribute('href');
+      cleanNode.target = '_blank';
+      cleanNode.rel = 'noopener noreferrer';
+    }
+    Array.from(node.childNodes).forEach(child => copyNode(child, cleanNode));
+    if (node.tagName === 'A' && cleanNode.href) {
+      cleanNode.textContent = new URL(cleanNode.href).hostname.replace(/^www\./i, '');
+    }
+    parent.appendChild(cleanNode);
+  }
+
+  Array.from(template.content.childNodes).forEach(node => copyNode(node, container));
+}
+
+function wait(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function animateBotHtml(container, html) {
+  const template = document.createElement('template');
+  template.innerHTML = convertMarkdownFormatting(html);
+  const allowedTags = new Set(['A', 'BR', 'EM', 'H2', 'H3', 'LI', 'OL', 'P', 'STRONG', 'UL']);
+
+  async function copyNode(node, parent) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const formattingPattern = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+      let cursor = 0;
+      let match;
+      while ((match = formattingPattern.exec(node.nodeValue)) !== null) {
+        const words = node.nodeValue.slice(cursor, match.index).split(/(\s+)/);
+        for (const word of words) {
+          parent.appendChild(document.createTextNode(word));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+          if (word.trim()) await wait(18);
+        }
+        const marker = match[0];
+        const formatted = document.createElement(marker.startsWith('**') ? 'strong' : 'em');
+        formatted.textContent = marker.slice(marker.startsWith('**') ? 2 : 1, marker.startsWith('**') ? -2 : -1);
+        parent.appendChild(formatted);
+        cursor = match.index + marker.length;
+      }
+      const remainingWords = node.nodeValue.slice(cursor).split(/(\s+)/);
+      for (const word of remainingWords) {
+        parent.appendChild(document.createTextNode(word));
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (word.trim()) await wait(18);
+      }
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (!allowedTags.has(node.tagName)) {
+      for (const child of node.childNodes) await copyNode(child, parent);
+      return;
+    }
+    const cleanNode = document.createElement(node.tagName.toLowerCase());
+    if (node.tagName === 'A' && /^https:\/\//i.test(node.getAttribute('href') || '')) {
+      cleanNode.href = node.getAttribute('href');
+      cleanNode.target = '_blank';
+      cleanNode.rel = 'noopener noreferrer';
+    }
+    parent.appendChild(cleanNode);
+    for (const child of node.childNodes) await copyNode(child, cleanNode);
+    if (node.tagName === 'A' && cleanNode.href) {
+      cleanNode.textContent = new URL(cleanNode.href).hostname.replace(/^www\./i, '');
+    }
+  }
+
+  for (const node of template.content.childNodes) await copyNode(node, container);
+  linkifyTextNodes(container);
+}
+
+function linkifyTextNodes(container) {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement && node.parentElement.closest('a')) continue;
+    if (/https:\/\/[^\s<>" ]+/i.test(node.nodeValue)) textNodes.push(node);
+  }
+  textNodes.forEach(textNode => {
+    const fragment = document.createDocumentFragment();
+    appendTextWithLinks(fragment, textNode.nodeValue);
+    textNode.replaceWith(fragment);
+  });
+}
+
+function isGreeting(text) {
+  const normalizedText = text.toLowerCase().replace(/[!?,.]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return /^(hi|hii|hello|helo|hey|namaste|namaskar|good morning|good afternoon|good evening|good night|नमस्ते|नमस्कार|हाय|हेलो|हैलो|शुभ प्रभात|शुभ संध्या)$/.test(normalizedText);
+}
+
+async function sendMessage() {
+  const text = inputEl.value.trim();
+  if (!text) return;
+  inputEl.value = '';
+  sendBtn.disabled = true;
+  addMessage(text, 'user');
+
+  if (isGreeting(text)) {
+    const greetingReply = UI_TEXT[currentLang].greetingReply;
+    const greetingEl = addMessage('', 'bot');
+    await animateBotHtml(greetingEl, greetingReply);
+    sendBtn.disabled = false;
+    inputEl.focus();
+    return;
+  }
+
+  const typingEl = addMessage(UI_TEXT[currentLang].typing, 'typing');
+
+  try {
+    let response;
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, lang: currentLang }),
+          signal: AbortSignal.timeout(90000)
+        });
+        if (response.ok || (response.status < 500 && response.status !== 408)) break;
+      } catch (err) {
+        lastError = err;
+      }
+      if (attempt === 0) await wait(700);
+    }
+    if (!response) throw lastError || new Error('Request failed');
+    const data = await response.json().catch(() => ({}));
+    typingEl.remove();
+    if (!response.ok || data.error) {
+      addMessage(UI_TEXT[currentLang].errorPrefix + (data.error || UI_TEXT[currentLang].errorUnavailable), 'bot');
+    } else {
+      const answerEl = addMessage('', 'bot');
+      const answerText = data.answer || UI_TEXT[currentLang].errorNoResponse;
+      await animateBotHtml(answerEl, answerText);
+    }
+  } catch (err) {
+    typingEl.remove();
+    addMessage(UI_TEXT[currentLang].errorUnavailable, 'bot');
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+inputEl.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') sendMessage();
+});
+
+const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let finalTranscript = '';
+
+function repairSpeechText(text) {
+  if (!text) return '';
+  let repaired = text.trim();
+  const replacements = [
+    [/\b(oecm|oecm\b)/gi, 'OSEM'],
+    [/\b(osm|o s m|o-s-m)\b/gi, 'OSEM'],
+    [/\b(up on|upon|up-on)\b/gi, 'UPON'],
+    [/\b(osem|osem\b)/gi, 'OSEM'],
+    [/\b(cmyuva|cm yuva|cm yuvaa)\b/gi, 'CM Yuva'],
+    [/\b(cmyouthadda|cm youth adda|cm youth adda)\b/gi, 'CM Youth Adda'],
+    [/\b(msm e|msme)\b/gi, 'MSME'],
+    [/\b(up i con|upicon|u p i c o n)\b/gi, 'UPICON'],
+    [/\s+/g, ' '],
+  ];
+  replacements.forEach(([pattern, replacement]) => {
+    repaired = repaired.replace(pattern, replacement);
+  });
+  return repaired.trim();
+}
+
+function normalizeSpeechTranscript(text) {
+  const cleaned = (text || '')
+    .replace(/[^a-zA-Z0-9\u0900-\u097F\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return repairSpeechText(cleaned);
+}
+
+function chooseBestSpeechResult(resultList) {
+  if (!resultList || !resultList.length) return '';
+  let bestText = '';
+  let bestConfidence = -1;
+  for (let i = 0; i < resultList.length; i += 1) {
+    const alt = resultList[i];
+    const transcript = (alt && alt.transcript ? alt.transcript : '').trim();
+    if (!transcript) continue;
+    const confidence = Number(alt.confidence || 0);
+    if (confidencesAreBetter(confidence, bestConfidence) || (!bestText && transcript)) {
+      bestText = transcript;
+      bestConfidence = confidence;
+    }
+  }
+  return normalizeSpeechTranscript(bestText);
+}
+
+function confidencesAreBetter(candidateConfidence, currentBestConfidence) {
+  if (candidateConfidence <= 0) return false;
+  if (currentBestConfidence < 0) return true;
+  return candidateConfidence > currentBestConfidence;
+}
+
+if (SpeechRecognitionImpl) {
+  micBtn.hidden = false;
+  recognition = new SpeechRecognitionImpl();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 5;
+
+  recognition.addEventListener('result', function (event) {
+    const bestTranscript = chooseBestSpeechResult(event.results && event.results[event.results.length - 1]);
+    if (bestTranscript) {
+      finalTranscript = bestTranscript;
+      inputEl.value = bestTranscript;
+    }
+  });
+
+  recognition.addEventListener('end', function () {
+    isListening = false;
+    micBtn.classList.remove('listening');
+    voiceStatus.classList.remove('visible');
+    const finalText = finalTranscript.trim();
+    finalTranscript = '';
+    if (finalText) {
+      inputEl.value = finalText;
+      sendMessage();
+    }
+  });
+
+  recognition.addEventListener('error', function () {
+    isListening = false;
+    micBtn.classList.remove('listening');
+    voiceStatus.classList.remove('visible');
+    finalTranscript = '';
+  });
+
+  micBtn.addEventListener('click', function () {
+    if (isListening) {
+      recognition.stop();
+      return;
+    }
+    finalTranscript = '';
+    recognition.lang = UI_TEXT[currentLang].speechLang;
+    try {
+      recognition.start();
+      isListening = true;
+      micBtn.classList.add('listening');
+      voiceStatus.classList.add('visible');
+    } catch (err) {
+      isListening = false;
+      micBtn.classList.remove('listening');
+      voiceStatus.classList.remove('visible');
+      finalTranscript = '';
+    }
+  });
+} else {
+  micBtn.hidden = true;
+}
+
+applyLanguage(currentLang, true);
+</script>
+</body>
+</html>
